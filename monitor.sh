@@ -100,7 +100,7 @@ monitor() {
         
         # топ процессов по оперативной памяти
         # все аналогично, но сортируем по rss (реальному использованию памяти)
-        ps aux --no-headers | sort -k6 -n -r | head -n "$TOP_CPU_COUNT" | while read -r user pid cpu mem vsz rss tty stat start time command; do
+        ps aux --no-headers | sort -k6 -n -r | head -n "$TOP_MEM_COUNT" | while read -r user pid cpu mem vsz rss tty stat start time command; do
             memoryBytes=$((rss * 1024)) #кб в б
             processName=$(basename "${command%% *}")
             logLine "$currentTime | $pid | $processName | ${cpu}% | $memoryBytes | MEM"
