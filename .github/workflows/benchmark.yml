@@ -1,0 +1,81 @@
+# GitHub Actions workflow для бенчмарка производительности monitor.sh
+# Измеряет пространственные (память, диск) и временные (CPU) ресурсы
+#
+# Логика вынесена в скрипты:
+#   scripts/collect_env.sh    - сбор характеристик среды
+#   scripts/run_benchmark.sh  - запуск monitor.sh и сбор метрик
+#   scripts/analyze_results.sh - анализ и формирование отчёта
+
+name: Performance Benchmark
+
+# Триггеры запуска workflow:
+#   push/pull_request - автоматический запуск при изменениях в main
+#   workflow_dispatch - ручной запуск с параметрами через UI GitHub
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_duration:
+        description: 'Длительность теста (секунды)'
+        required: false
+        default: '30'
+
+jobs:
+  benchmark:
+    name: Benchmark производительности
+    runs-on: ubuntu-latest
+
+    steps:
+      # Подготовка окружения
+
+      # actions/checkout@v4 - клонирует репозиторий в рабочую директорию раннера
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
+
+      - name: Установка зависимостей
+        run: |
+          # apt-get update -qq - обновление списка пакетов (тихий режим)
+          # apt-get install -y - установка без подтверждения
+          #   bc - калькулятор для float-арифметики
+          #   sysstat - утилиты мониторинга (iostat, mpstat)
+          sudo apt-get update -qq
+          sudo apt-get install -y bc sysstat
+
+      - name: Права на выполнение скриптов
+        run: |
+          chmod +x monitor.sh
+          chmod +x scripts/*.sh
+
+      # Выполнение benchmark
+
+      - name: Сбор характеристик среды
+        # Выводит информацию об ОС, CPU, RAM, диске
+        run: ./scripts/collect_env.sh
+
+      - name: Запуск benchmark
+        # Запускает monitor.sh, собирает метрики CPU/MEM
+        # Аргумент: длительность теста в секундах
+        # github.event.inputs.* - параметры из workflow_dispatch
+        run: ./scripts/run_benchmark.sh "${{ github.event.inputs.test_duration || '30' }}"
+
+      - name: Анализ результатов
+        # Обрабатывает логи, считает статистику, выводит отчёт
+        # if: always() - выполнить даже если предыдущий шаг упал
+        if: always()
+        run: ./scripts/analyze_results.sh
+
+      # Сохранение логов
+
+      - name: Сохранение логов
+        if: always()
+        # actions/upload-artifact@v4 - загружает файлы как артефакты workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-logs          
+          path: |                        
+            benchmark_test.log
+            metrics.txt
+          retention-days: 7             
